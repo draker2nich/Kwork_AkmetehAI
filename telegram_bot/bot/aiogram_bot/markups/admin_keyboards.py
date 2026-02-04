@@ -27,7 +27,8 @@ async def build_category_keyboard(current_category_id: int | None = None):
                 "text": "📝",
                 "photo": "🖼",
                 "video": "🎥",
-                "document": "📄"
+                "document": "📄",
+                "pptx": "📊"
             }
             icon = icon_map.get(item.content_type, "📦")
             builder.button(text=f"{icon} {item.name}", callback_data=f"nav_item_{item.id}")

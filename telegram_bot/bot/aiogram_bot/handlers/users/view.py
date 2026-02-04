@@ -15,9 +15,6 @@ router = Router()
 logger = logging.getLogger(__name__)
 
 
-# УДАЛЕНО: хендлер @router.message(F.text == "🗂 Каталог") - больше не нужен
-
-
 @router.callback_query(F.data == "user_cat_root")
 async def nav_user_root(callback: types.CallbackQuery, state: FSMContext):
     logger.info(f"User {callback.from_user.id} navigated to root category")
@@ -75,6 +72,7 @@ async def show_category(message: types.Message, cat_id: int | None, state: FSMCo
     if active_filter:
         filter_name = {
             "document": "PDF / Документы",
+            "pptx": "Презентации (PPTX)",
             "video": "Видео",
             "text": "Текст"
         }.get(active_filter, active_filter)

@@ -12,7 +12,6 @@ async def build_user_category_keyboard(current_category_id: int | None = None):
 
     if current_category_id is None:
         categories = await db.get_root_categories()
-        # Используем START_TEXT вместо "Привет! Что ищем сегодня?"
         header_text = START_TEXT
     else:
         categories = await db.get_subcategories(current_category_id)
@@ -45,6 +44,7 @@ def get_back_to_category_keyboard(category_id: int) -> InlineKeyboardMarkup:
 def get_filter_selection_keyboard() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="📄 PDF / Документы", callback_data="set_filter_document")
+    builder.button(text="📊 Презентации (PPTX)", callback_data="set_filter_pptx")
     builder.button(text="🎥 Видео", callback_data="set_filter_video")
     builder.button(text="📝 Текст", callback_data="set_filter_text")
     builder.button(text="❌ Без фильтра", callback_data="set_filter_none")

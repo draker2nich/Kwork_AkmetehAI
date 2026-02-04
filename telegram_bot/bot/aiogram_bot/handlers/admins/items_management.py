@@ -134,10 +134,6 @@ async def process_category_name(message: types.Message, state: FSMContext):
     await state.update_data(name=message.text)
     await state.set_state(AdminState.waiting_for_category_prompt)
 
-    # Determine back callback for the next step (back to name)
-    # But back to name needs to know parent_id to render the 'Back' button of the name step correctly?
-    # No, back_to_name handler handles that.
-
     await message.answer("✍️ Введите текст для этой категории:",
                          reply_markup=get_skip_keyboard("add_cat_skip_prompt", "add_cat_back_to_name"))
 
@@ -171,7 +167,6 @@ async def finish_add_category(event, state: FSMContext, prompt_text: str | None)
     parent_id = data.get("parent_id")
     name = data.get("name")
 
-    # If event is CallbackQuery, use event.message
     message = event.message if isinstance(event, types.CallbackQuery) else event
     
     logger.info(f"Admin creating category '{name}' (parent_id={parent_id})")
@@ -288,9 +283,14 @@ async def item_content_received(message: types.Message, state: FSMContext):
         file_id = message.video.file_id
         original_filename = message.video.file_name
     elif message.document:
-        content_type = "document"
         file_id = message.document.file_id
         original_filename = message.document.file_name
+        
+        # Определяем тип по расширению файла
+        if original_filename and original_filename.lower().endswith('.pptx'):
+            content_type = "pptx"
+        else:
+            content_type = "document"
     else:
         await message.answer("❌ Неподдерживаемый тип контента. Попробуйте снова.",
                              reply_markup=get_back_keyboard("add_item_back_to_name"))
