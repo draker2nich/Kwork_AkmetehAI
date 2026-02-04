@@ -4,19 +4,50 @@ from aiogram import Router, F, types
 from aiogram.fsm.context import FSMContext
 
 from bot.aiogram_bot.markups.keyboards import get_main_keyboard
+from bot.aiogram_bot.markups.user_keyboards import build_user_category_keyboard
 from bot.database.models import User
-from bot.texts import BACK_BTN, START_TEXT
+from bot.texts import BACK_BTN
 
 router = Router()
 logger = logging.getLogger(__name__)
 
 
 @router.message(F.text.startswith("/start"))
-@router.message(F.text == BACK_BTN)
 async def start_btn(message: types.Message, state: FSMContext, user: User):
+    """При /start сразу показываем категории с inline-кнопками"""
     await state.clear()
-    return await message.bot.send_message(
+    await state.update_data(active_filter=None)
+    
+    # Получаем клавиатуру с категориями и текст приветствия
+    kb, text = await build_user_category_keyboard(None)
+    
+    # Отправляем сообщение с inline-кнопками категорий
+    # Также устанавливаем reply-клавиатуру (для админов - с кнопкой админ-панели)
+    await message.bot.send_message(
         user.user_id,
-        text=START_TEXT,
-        reply_markup=get_main_keyboard(user),
+        text=text,
+        reply_markup=kb,
     )
+    
+    # Устанавливаем reply-клавиатуру отдельно (если нужна для админов)
+    main_kb = get_main_keyboard(user)
+    if main_kb and not isinstance(main_kb, types.ReplyKeyboardRemove):
+        # Отправляем невидимое сообщение для установки reply-клавиатуры
+        # или можно просто не отправлять, т.к. inline-кнопки уже есть
+        pass
+
+
+@router.message(F.text == BACK_BTN)
+async def back_btn(message: types.Message, state: FSMContext, user: User):
+    """Кнопка назад - возвращает к корневым категориям"""
+    await state.clear()
+    await state.update_data(active_filter=None)
+    
+    kb, text = await build_user_category_keyboard(None)
+    
+    await message.bot.send_message(
+        user.user_id,
+        text=text,
+        reply_markup=kb,
+    )
+

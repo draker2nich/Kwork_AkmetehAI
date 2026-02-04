@@ -15,20 +15,20 @@ router = Router()
 logger = logging.getLogger(__name__)
 
 
-@router.message(F.text == "🗂 Каталог")
-async def open_catalog(message: types.Message, state: FSMContext):
-    """Открывает корневой каталог"""
-    logger.info(f"User {message.from_user.id} opened catalog")
-    await state.update_data(active_filter=None)
-    kb, text = await build_user_category_keyboard(None)
-    await message.answer(text, reply_markup=kb)
+# УДАЛЕНО: хендлер @router.message(F.text == "🗂 Каталог") - больше не нужен
 
 
 @router.callback_query(F.data == "user_cat_root")
 async def nav_user_root(callback: types.CallbackQuery, state: FSMContext):
     logger.info(f"User {callback.from_user.id} navigated to root category")
+    await state.update_data(active_filter=None)
     kb, text = await build_user_category_keyboard(None)
-    await callback.message.edit_text(text, reply_markup=kb)
+    
+    try:
+        await callback.message.edit_text(text, reply_markup=kb)
+    except Exception:
+        await callback.message.delete()
+        await callback.message.answer(text, reply_markup=kb)
 
 
 @router.callback_query(F.data.startswith("user_cat_"))
@@ -52,7 +52,7 @@ async def open_filter_menu(callback: types.CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data.startswith("set_filter_"))
 async def set_filter(callback: types.CallbackQuery, state: FSMContext):
-    filter_type = callback.data.split("_")[2]  # document, video, text, none
+    filter_type = callback.data.split("_")[2]
     
     logger.info(f"User {callback.from_user.id} set filter: {filter_type}")
     if filter_type == "none":

@@ -3,6 +3,7 @@ from aiogram.types import InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from bot.database.requests import products as db
+from bot.texts import START_TEXT
 
 
 async def build_user_category_keyboard(current_category_id: int | None = None):
@@ -11,7 +12,8 @@ async def build_user_category_keyboard(current_category_id: int | None = None):
 
     if current_category_id is None:
         categories = await db.get_root_categories()
-        header_text = "👋 Привет! Что ищем сегодня?"
+        # Используем START_TEXT вместо "Привет! Что ищем сегодня?"
+        header_text = START_TEXT
     else:
         categories = await db.get_subcategories(current_category_id)
         current_cat = await db.get_category_by_id(current_category_id)
