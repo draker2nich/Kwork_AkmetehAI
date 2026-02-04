@@ -44,9 +44,11 @@ async def build_category_keyboard(current_category_id: int | None = None):
         control_buttons.append(
             types.InlineKeyboardButton(text="➕ Предмет", callback_data=f"add_item_{current_category_id}"))
         control_buttons.append(
-            types.InlineKeyboardButton(text="✏️ Изм. текст", callback_data=f"edit_prompt_{current_category_id}"))
+            types.InlineKeyboardButton(text="✏️ Название", callback_data=f"edit_cat_name_{current_category_id}"))
         control_buttons.append(
-            types.InlineKeyboardButton(text="❌ Удалить эту категорию", callback_data=f"del_cat_{current_category_id}"))
+            types.InlineKeyboardButton(text="✏️ Текст", callback_data=f"edit_prompt_{current_category_id}"))
+        control_buttons.append(
+            types.InlineKeyboardButton(text="❌ Удалить категорию", callback_data=f"del_cat_{current_category_id}"))
 
         parent = (await db.get_category_by_id(current_category_id)).parent_id
         back_cb = f"nav_cat_{parent}" if parent else "nav_cat_root"
@@ -59,8 +61,12 @@ async def build_category_keyboard(current_category_id: int | None = None):
 
 def get_item_details_keyboard(item_id: int, category_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
+    builder.button(text="✏️ Название", callback_data=f"edit_item_name_{item_id}")
+    builder.button(text="✏️ Описание", callback_data=f"edit_item_desc_{item_id}")
+    builder.button(text="🔄 Заменить файл", callback_data=f"edit_item_file_{item_id}")
     builder.button(text="❌ Удалить предмет", callback_data=f"del_item_{item_id}")
     builder.button(text="⬅️ К категории", callback_data=f"nav_cat_{category_id}")
+    builder.adjust(2)
     return builder.as_markup()
 
 
