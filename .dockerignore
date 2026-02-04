@@ -1,0 +1,84 @@
+# ─── PYTHON / FASTAPI / BACKEND ───────────────────────────────────────────────
+
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite
+*.sqlite3
+
+# venv
+venv/
+env/
+.venv/
+
+# tests cache
+htmlcov/
+.coverage
+.cache/
+
+# pytest cache
+pytest_cache/
+
+# mypy
+.mypy_cache/
+
+
+# ─── NODE / VUE / REACT ───────────────────────────────────────────────────────
+
+node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+pnpm-lock.yaml
+.pnpm-store/
+
+dist/
+build/
+.cache/
+.eslintcache
+
+
+# ─── PROJECT FILES ────────────────────────────────────────────────────────────
+
+.env
+.env.*
+!.env.example
+
+.DS_Store
+.idea/
+.vscode/
+*.iml
+
+
+# ─── YOUR ASSETS / MEDIA (VERY IMPORTANT!) ────────────────────────────────────
+
+# huge generated files (videos, gifs, photos)
+videos/
+videos_raw/
+videos_processed/
+videos_compressed/
+gifs/
+images_generated/
+media/
+uploads/
+
+# your bot-specific volumes
+logs/
+errors/
+tmp/
+temp/
+cache/
+
+
+# ─── DOCKER / GIT ─────────────────────────────────────────────────────────────
+
+.git/
+.gitignore
+docker-compose.override.yml
+
+# local tooling
+*.log
+*.pid
+*.swp

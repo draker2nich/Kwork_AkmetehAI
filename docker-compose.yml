@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  bot:
+    build:
+      context: telegram_bot
+      dockerfile: Dockerfile
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+    env_file:
+      - .env
+    working_dir: /app
+    
+    volumes:
+      - ./logs:/app/logs
+      - ./errors:/app/errors
+      - ./files:/app/files
+      - ./categories.json:/app/categories.json
+      - ./init_files:/app/init_files
+    networks:
+      - bot_network
+
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: ${SQLALCHEMY_DB_NAME}
+      POSTGRES_USER: ${SQLALCHEMY_USER}
+      POSTGRES_PASSWORD: ${SQLALCHEMY_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5435:5432"
+    restart: unless-stopped
+    networks:
+      - bot_network
+
+  redis:
+    image: redis:7-alpine
+    # ports:
+    #   - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - bot_network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  bot_network:
+    driver: bridge 
