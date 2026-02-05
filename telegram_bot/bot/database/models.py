@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, func, ForeignKey
+from sqlalchemy import BigInteger, DateTime, func, ForeignKey, Integer
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -50,6 +50,7 @@ class Category(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(nullable=False)
     prompt_text: Mapped[str | None] = mapped_column(nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     parent_id: Mapped[int | None] = mapped_column(ForeignKey('categories.id'), nullable=True)
 
@@ -58,7 +59,7 @@ class Category(Base):
     items: Mapped[list["Item"]] = relationship("Item", back_populates="category", cascade="all, delete-orphan")
 
     def __repr__(self):
-        return f"<Category(id={self.id}, name='{self.name}', parent_id={self.parent_id})>"
+        return f"<Category(id={self.id}, name='{self.name}', parent_id={self.parent_id}, sort_order={self.sort_order})>"
 
 
 class Item(Base):
@@ -69,6 +70,7 @@ class Item(Base):
     description: Mapped[str | None] = mapped_column(nullable=True)
 
     content_type: Mapped[str] = mapped_column(nullable=False, default="text")
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     file_id: Mapped[str | None] = mapped_column(nullable=True)
 
@@ -90,11 +92,30 @@ async def on_startup_database():
         await conn.run_sync(Base.metadata.create_all)
         logger.info("Tables created (if not existed).")
 
+        # Migration for prompt_text
         try:
             logger.info("Running migration for prompt_text...")
             async with conn.begin_nested():
                 await conn.execute(text("ALTER TABLE categories ADD COLUMN prompt_text VARCHAR"))
             logger.info("Added prompt_text column to categories")
+        except Exception as e:
+            logger.info(f"Migration skipped (likely column exists): {e}")
+
+        # Migration for sort_order in categories
+        try:
+            logger.info("Running migration for sort_order in categories...")
+            async with conn.begin_nested():
+                await conn.execute(text("ALTER TABLE categories ADD COLUMN sort_order INTEGER DEFAULT 0 NOT NULL"))
+            logger.info("Added sort_order column to categories")
+        except Exception as e:
+            logger.info(f"Migration skipped (likely column exists): {e}")
+
+        # Migration for sort_order in items
+        try:
+            logger.info("Running migration for sort_order in items...")
+            async with conn.begin_nested():
+                await conn.execute(text("ALTER TABLE items ADD COLUMN sort_order INTEGER DEFAULT 0 NOT NULL"))
+            logger.info("Added sort_order column to items")
         except Exception as e:
             logger.info(f"Migration skipped (likely column exists): {e}")
 

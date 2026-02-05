@@ -1,7 +1,7 @@
 import json
 import logging
 
-from sqlalchemy import select, update
+from sqlalchemy import select, update, func
 
 from bot.database.models import async_session, Category, Item
 
@@ -39,9 +39,11 @@ async def export_categories_to_json(file_path: str = "categories.json"):
         def build_tree(category_id):
             tree = {}
             children = children_map.get(category_id, [])
+            children.sort(key=lambda x: x.sort_order)
 
             for child in children:
                 cat_items = items_map.get(child.id, [])
+                cat_items.sort(key=lambda x: x.sort_order)
                 items_data = []
                 for item in cat_items:
                     items_data.append({
@@ -49,11 +51,13 @@ async def export_categories_to_json(file_path: str = "categories.json"):
                         "description": item.description,
                         "content_type": item.content_type,
                         "file_id": item.file_id,
-                        "file_path": item.file_path
+                        "file_path": item.file_path,
+                        "sort_order": item.sort_order
                     })
 
                 child_data = {
                     "prompt_text": child.prompt_text,
+                    "sort_order": child.sort_order,
                     "items": items_data,
                     "subcategories": build_tree(child.id)
                 }
@@ -61,8 +65,10 @@ async def export_categories_to_json(file_path: str = "categories.json"):
             return tree
 
         final_structure = {}
+        roots.sort(key=lambda x: x.sort_order)
         for root in roots:
             cat_items = items_map.get(root.id, [])
+            cat_items.sort(key=lambda x: x.sort_order)
             items_data = []
             for item in cat_items:
                 items_data.append({
@@ -70,11 +76,13 @@ async def export_categories_to_json(file_path: str = "categories.json"):
                     "description": item.description,
                     "content_type": item.content_type,
                     "file_id": item.file_id,
-                    "file_path": item.file_path
+                    "file_path": item.file_path,
+                    "sort_order": item.sort_order
                 })
 
             final_structure[root.name] = {
                 "prompt_text": root.prompt_text,
+                "sort_order": root.sort_order,
                 "items": items_data,
                 "subcategories": build_tree(root.id)
             }
@@ -87,16 +95,24 @@ async def export_categories_to_json(file_path: str = "categories.json"):
 
 
 async def get_root_categories():
-    """Получить список корневых категорий (у которых нет родителя)"""
+    """Получить список корневых категорий (у которых нет родителя), отсортированных по sort_order"""
     async with async_session() as session:
-        result = await session.scalars(select(Category).where(Category.parent_id.is_(None)))
+        result = await session.scalars(
+            select(Category)
+            .where(Category.parent_id.is_(None))
+            .order_by(Category.sort_order, Category.id)
+        )
         return result.all()
 
 
 async def get_subcategories(category_id: int):
-    """Получить подкатегории для заданной категории"""
+    """Получить подкатегории для заданной категории, отсортированные по sort_order"""
     async with async_session() as session:
-        result = await session.scalars(select(Category).where(Category.parent_id == category_id))
+        result = await session.scalars(
+            select(Category)
+            .where(Category.parent_id == category_id)
+            .order_by(Category.sort_order, Category.id)
+        )
         return result.all()
 
 
@@ -106,14 +122,25 @@ async def get_category_by_id(category_id: int):
         return await session.get(Category, category_id)
 
 
+async def get_next_category_sort_order(parent_id: int | None) -> int:
+    """Получить следующий sort_order для новой категории"""
+    async with async_session() as session:
+        result = await session.scalar(
+            select(func.coalesce(func.max(Category.sort_order), -1) + 1)
+            .where(Category.parent_id == parent_id if parent_id else Category.parent_id.is_(None))
+        )
+        return result or 0
+
+
 async def add_category(name: str, parent_id: int | None = None, prompt_text: str | None = None):
     """Создать новую категорию"""
     async with async_session() as session:
-        category = Category(name=name, parent_id=parent_id, prompt_text=prompt_text)
+        sort_order = await get_next_category_sort_order(parent_id)
+        category = Category(name=name, parent_id=parent_id, prompt_text=prompt_text, sort_order=sort_order)
         session.add(category)
         await session.commit()
         await session.refresh(category)
-        logger.info(f"Created category {category.id} ('{name}')")
+        logger.info(f"Created category {category.id} ('{name}') with sort_order={sort_order}")
 
     await export_categories_to_json()
     return category
@@ -142,11 +169,62 @@ async def delete_category(category_id: int):
     await export_categories_to_json()
 
 
+async def move_category(category_id: int, direction: str) -> bool:
+    """Переместить категорию вверх или вниз. Возвращает True если перемещение выполнено."""
+    async with async_session() as session:
+        category = await session.get(Category, category_id)
+        if not category:
+            return False
+
+        # Получаем соседние категории
+        if category.parent_id is None:
+            siblings = await session.scalars(
+                select(Category)
+                .where(Category.parent_id.is_(None))
+                .order_by(Category.sort_order, Category.id)
+            )
+        else:
+            siblings = await session.scalars(
+                select(Category)
+                .where(Category.parent_id == category.parent_id)
+                .order_by(Category.sort_order, Category.id)
+            )
+        
+        siblings_list = list(siblings.all())
+        current_idx = next((i for i, c in enumerate(siblings_list) if c.id == category_id), None)
+        
+        if current_idx is None:
+            return False
+
+        if direction == "up" and current_idx > 0:
+            swap_idx = current_idx - 1
+        elif direction == "down" and current_idx < len(siblings_list) - 1:
+            swap_idx = current_idx + 1
+        else:
+            return False
+
+        # Меняем sort_order местами
+        cat1, cat2 = siblings_list[current_idx], siblings_list[swap_idx]
+        cat1.sort_order, cat2.sort_order = cat2.sort_order, cat1.sort_order
+        
+        # Если sort_order одинаковые, присваиваем уникальные значения
+        if cat1.sort_order == cat2.sort_order:
+            cat1.sort_order = current_idx
+            cat2.sort_order = swap_idx
+            if direction == "up":
+                cat1.sort_order, cat2.sort_order = cat2.sort_order, cat1.sort_order
+
+        session.add(cat1)
+        session.add(cat2)
+        await session.commit()
+        logger.info(f"Moved category {category_id} {direction}")
+
+    await export_categories_to_json()
+    return True
+
+
 async def get_category_full_path(category_id: int) -> list[str]:
-    """
-    Возвращает список имен категорий от корня до текущей.
-    Например: ['Электроника', 'Телефоны', 'Apple']
-    """
+    """Возвращает список имен категорий от корня до текущей."""
     async with async_session() as session:
         path = []
         current_id = category_id
@@ -162,9 +240,13 @@ async def get_category_full_path(category_id: int) -> list[str]:
 
 
 async def get_items_by_category(category_id: int):
-    """Получить товары в категории"""
+    """Получить товары в категории, отсортированные по sort_order"""
     async with async_session() as session:
-        result = await session.scalars(select(Item).where(Item.category_id == category_id))
+        result = await session.scalars(
+            select(Item)
+            .where(Item.category_id == category_id)
+            .order_by(Item.sort_order, Item.id)
+        )
         return result.all()
 
 
@@ -174,22 +256,34 @@ async def get_item_by_id(item_id: int):
         return await session.get(Item, item_id)
 
 
+async def get_next_item_sort_order(category_id: int) -> int:
+    """Получить следующий sort_order для нового товара"""
+    async with async_session() as session:
+        result = await session.scalar(
+            select(func.coalesce(func.max(Item.sort_order), -1) + 1)
+            .where(Item.category_id == category_id)
+        )
+        return result or 0
+
+
 async def add_item(name: str, category_id: int, content_type: str, description: str | None = None,
                    file_id: str | None = None, file_path: str | None = None):
     """Добавить новый товар"""
     async with async_session() as session:
+        sort_order = await get_next_item_sort_order(category_id)
         item = Item(
             name=name,
             category_id=category_id,
             content_type=content_type,
             description=description,
             file_id=file_id,
-            file_path=file_path
+            file_path=file_path,
+            sort_order=sort_order
         )
         session.add(item)
         await session.commit()
         await session.refresh(item)
-        logger.info(f"Added item {item.id} ('{name}') to category {category_id}")
+        logger.info(f"Added item {item.id} ('{name}') to category {category_id} with sort_order={sort_order}")
         return item
 
 
@@ -210,3 +304,48 @@ async def delete_item(item_id: int):
             await session.delete(item)
             await session.commit()
             logger.info(f"Deleted item {item_id}")
+
+
+async def move_item(item_id: int, direction: str) -> bool:
+    """Переместить товар вверх или вниз. Возвращает True если перемещение выполнено."""
+    async with async_session() as session:
+        item = await session.get(Item, item_id)
+        if not item:
+            return False
+
+        siblings = await session.scalars(
+            select(Item)
+            .where(Item.category_id == item.category_id)
+            .order_by(Item.sort_order, Item.id)
+        )
+        
+        siblings_list = list(siblings.all())
+        current_idx = next((i for i, it in enumerate(siblings_list) if it.id == item_id), None)
+        
+        if current_idx is None:
+            return False
+
+        if direction == "up" and current_idx > 0:
+            swap_idx = current_idx - 1
+        elif direction == "down" and current_idx < len(siblings_list) - 1:
+            swap_idx = current_idx + 1
+        else:
+            return False
+
+        # Меняем sort_order местами
+        item1, item2 = siblings_list[current_idx], siblings_list[swap_idx]
+        item1.sort_order, item2.sort_order = item2.sort_order, item1.sort_order
+        
+        # Если sort_order одинаковые, присваиваем уникальные значения
+        if item1.sort_order == item2.sort_order:
+            item1.sort_order = current_idx
+            item2.sort_order = swap_idx
+            if direction == "up":
+                item1.sort_order, item2.sort_order = item2.sort_order, item1.sort_order
+
+        session.add(item1)
+        session.add(item2)
+        await session.commit()
+        logger.info(f"Moved item {item_id} {direction}")
+
+    return True

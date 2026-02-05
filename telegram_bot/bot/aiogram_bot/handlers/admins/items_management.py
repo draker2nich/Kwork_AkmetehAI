@@ -26,6 +26,85 @@ async def start_items_management(message: types.Message, state: FSMContext):
     await message.answer(text, reply_markup=kb)
 
 
+@router.callback_query(F.data == "noop")
+async def noop_handler(callback: types.CallbackQuery):
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("sort_cat_up_"))
+async def sort_category_up(callback: types.CallbackQuery, state: FSMContext):
+    cat_id = int(callback.data.split("_")[3])
+    logger.info(f"Admin {callback.from_user.id} moving category {cat_id} up")
+    category = await db.get_category_by_id(cat_id)
+    moved = await db.move_category(cat_id, "up")
+    if moved:
+        await callback.answer("✅ Перемещено вверх")
+    else:
+        await callback.answer("⚠️ Невозможно переместить")
+        return
+    parent_id = category.parent_id if category else None
+    kb, text = await build_category_keyboard(parent_id)
+    try:
+        await callback.message.edit_text(text, reply_markup=kb)
+    except Exception as e:
+        logger.exception(f'Error: {e}')
+
+
+@router.callback_query(F.data.startswith("sort_cat_down_"))
+async def sort_category_down(callback: types.CallbackQuery, state: FSMContext):
+    cat_id = int(callback.data.split("_")[3])
+    logger.info(f"Admin {callback.from_user.id} moving category {cat_id} down")
+    category = await db.get_category_by_id(cat_id)
+    moved = await db.move_category(cat_id, "down")
+    if moved:
+        await callback.answer("✅ Перемещено вниз")
+    else:
+        await callback.answer("⚠️ Невозможно переместить")
+        return
+    parent_id = category.parent_id if category else None
+    kb, text = await build_category_keyboard(parent_id)
+    try:
+        await callback.message.edit_text(text, reply_markup=kb)
+    except Exception as e:
+        logger.exception(f'Error: {e}')
+
+
+@router.callback_query(F.data.startswith("sort_item_up_"))
+async def sort_item_up(callback: types.CallbackQuery, state: FSMContext):
+    item_id = int(callback.data.split("_")[3])
+    logger.info(f"Admin {callback.from_user.id} moving item {item_id} up")
+    item = await db.get_item_by_id(item_id)
+    moved = await db.move_item(item_id, "up")
+    if moved:
+        await callback.answer("✅ Перемещено вверх")
+    else:
+        await callback.answer("⚠️ Невозможно переместить")
+        return
+    kb, text = await build_category_keyboard(item.category_id)
+    try:
+        await callback.message.edit_text(text, reply_markup=kb)
+    except Exception as e:
+        logger.exception(f'Error: {e}')
+
+
+@router.callback_query(F.data.startswith("sort_item_down_"))
+async def sort_item_down(callback: types.CallbackQuery, state: FSMContext):
+    item_id = int(callback.data.split("_")[3])
+    logger.info(f"Admin {callback.from_user.id} moving item {item_id} down")
+    item = await db.get_item_by_id(item_id)
+    moved = await db.move_item(item_id, "down")
+    if moved:
+        await callback.answer("✅ Перемещено вниз")
+    else:
+        await callback.answer("⚠️ Невозможно переместить")
+        return
+    kb, text = await build_category_keyboard(item.category_id)
+    try:
+        await callback.message.edit_text(text, reply_markup=kb)
+    except Exception as e:
+        logger.exception(f'Error: {e}')
+
+
 @router.callback_query(F.data == "nav_cat_root")
 async def nav_root(callback: types.CallbackQuery, state: FSMContext):
     logger.info(f"Admin {callback.from_user.id} navigated to root")
@@ -73,7 +152,6 @@ async def nav_item_details(callback: types.CallbackQuery):
     await send_item_content(callback.message, item, caption, reply_markup=kb)
 
 
-# === РЕДАКТИРОВАНИЕ НАЗВАНИЯ КАТЕГОРИИ ===
 @router.callback_query(F.data.startswith("edit_cat_name_"))
 async def edit_category_name_handler(callback: types.CallbackQuery, state: FSMContext):
     cat_id = int(callback.data.split("_")[3])
@@ -102,7 +180,6 @@ async def process_new_category_name(message: types.Message, state: FSMContext):
     await state.clear()
 
 
-# === РЕДАКТИРОВАНИЕ ТЕКСТА (PROMPT) КАТЕГОРИИ ===
 @router.callback_query(F.data.startswith("edit_prompt_"))
 async def edit_prompt_handler(callback: types.CallbackQuery, state: FSMContext):
     cat_id = int(callback.data.split("_")[2])
@@ -132,7 +209,6 @@ async def process_new_prompt(message: types.Message, state: FSMContext):
     await state.clear()
 
 
-# === РЕДАКТИРОВАНИЕ НАЗВАНИЯ ПРЕДМЕТА ===
 @router.callback_query(F.data.startswith("edit_item_name_"))
 async def edit_item_name_handler(callback: types.CallbackQuery, state: FSMContext):
     item_id = int(callback.data.split("_")[3])
@@ -167,7 +243,6 @@ async def process_new_item_name(message: types.Message, state: FSMContext):
     await state.clear()
 
 
-# === РЕДАКТИРОВАНИЕ ОПИСАНИЯ ПРЕДМЕТА ===
 @router.callback_query(F.data.startswith("edit_item_desc_"))
 async def edit_item_desc_handler(callback: types.CallbackQuery, state: FSMContext):
     item_id = int(callback.data.split("_")[3])
@@ -205,7 +280,6 @@ async def process_new_item_desc(message: types.Message, state: FSMContext):
     await state.clear()
 
 
-# === ЗАМЕНА ФАЙЛА ПРЕДМЕТА ===
 @router.callback_query(F.data.startswith("edit_item_file_"))
 async def edit_item_file_handler(callback: types.CallbackQuery, state: FSMContext):
     item_id = int(callback.data.split("_")[3])
@@ -245,7 +319,7 @@ async def process_new_item_file(message: types.Message, state: FSMContext):
         else:
             content_type = "document"
     else:
-        await message.answer("❌ Неподдерживаемый тип файла. Отправьте фото, видео или документ.")
+        await message.answer("❌ Неподдерживаемый тип файла.")
         return
 
     if item.file_path and os.path.exists(item.file_path):
@@ -277,7 +351,7 @@ async def process_new_item_file(message: types.Message, state: FSMContext):
         counter += 1
 
     await bot.download_file(file_info.file_path, file_path)
-    logger.info(f"Admin {message.from_user.id} replacing file for item {item_id} (new path={file_path})")
+    logger.info(f"Admin {message.from_user.id} replacing file for item {item_id}")
     await db.update_item(item_id, content_type=content_type, file_id=file_id, file_path=file_path)
 
     item = await db.get_item_by_id(item_id)
@@ -291,7 +365,6 @@ async def process_new_item_file(message: types.Message, state: FSMContext):
     await state.clear()
 
 
-# === ДОБАВЛЕНИЕ КАТЕГОРИИ ===
 @router.callback_query(F.data.startswith("add_cat_"))
 async def start_add_category(callback: types.CallbackQuery, state: FSMContext):
     data_part = callback.data.split("_")[2]
@@ -348,7 +421,6 @@ async def finish_add_category(event, state: FSMContext, prompt_text: str | None)
     await state.clear()
 
 
-# === УДАЛЕНИЕ КАТЕГОРИИ ===
 @router.callback_query(F.data.startswith("del_cat_"))
 async def delete_category_handler(callback: types.CallbackQuery):
     cat_id = int(callback.data.split("_")[2])
@@ -368,7 +440,6 @@ async def delete_category_handler(callback: types.CallbackQuery):
         await callback.message.answer(text, reply_markup=kb)
 
 
-# === УДАЛЕНИЕ ПРЕДМЕТА ===
 @router.callback_query(F.data.startswith("del_item_"))
 async def delete_item_handler(callback: types.CallbackQuery):
     item_id = int(callback.data.split("_")[2])
@@ -393,7 +464,6 @@ async def delete_item_handler(callback: types.CallbackQuery):
         await callback.message.answer(text, reply_markup=kb)
 
 
-# === ДОБАВЛЕНИЕ ПРЕДМЕТА ===
 @router.callback_query(F.data.startswith("add_item_"))
 async def start_add_item(callback: types.CallbackQuery, state: FSMContext):
     cat_id = int(callback.data.split("_")[2])
@@ -449,7 +519,7 @@ async def item_content_received(message: types.Message, state: FSMContext):
         else:
             content_type = "document"
     else:
-        await message.answer("❌ Неподдерживаемый тип контента. Попробуйте снова.",
+        await message.answer("❌ Неподдерживаемый тип контента.",
                              reply_markup=get_back_keyboard("add_item_back_to_name"))
         return
 
@@ -490,7 +560,7 @@ async def item_content_received(message: types.Message, state: FSMContext):
         counter += 1
 
     await bot.download_file(file_info.file_path, file_path)
-    logger.info(f"Admin adding file item '{data['name']}' to category {data['category_id']} (path={file_path})")
+    logger.info(f"Admin adding file item '{data['name']}' to category {data['category_id']}")
     item = await db.add_item(
         name=data['name'],
         category_id=data['category_id'],
@@ -499,7 +569,7 @@ async def item_content_received(message: types.Message, state: FSMContext):
         file_id=file_id,
         file_path=file_path
     )
-    await message.answer(f"✅ Предмет <b>{item.name}</b> успешно добавлен! Файл сохранен.")
+    await message.answer(f"✅ Предмет <b>{item.name}</b> успешно добавлен!")
     kb, text = await build_category_keyboard(data['category_id'])
     await message.answer(text, reply_markup=kb)
     await state.clear()

@@ -17,12 +17,30 @@ async def build_category_keyboard(current_category_id: int | None = None):
         current_cat = await db.get_category_by_id(current_category_id)
         header_text = f"📂 Категория: <b>{current_cat.name}</b>"
 
-    for cat in categories:
-        builder.button(text=f"📁 {cat.name}", callback_data=f"nav_cat_{cat.id}")
+    # Категории с кнопками сортировки
+    for i, cat in enumerate(categories):
+        row = []
+        # Кнопка вверх (если не первый)
+        if i > 0:
+            row.append(types.InlineKeyboardButton(text="⬆️", callback_data=f"sort_cat_up_{cat.id}"))
+        else:
+            row.append(types.InlineKeyboardButton(text="  ", callback_data="noop"))
+        
+        # Основная кнопка категории
+        row.append(types.InlineKeyboardButton(text=f"📁 {cat.name}", callback_data=f"nav_cat_{cat.id}"))
+        
+        # Кнопка вниз (если не последний)
+        if i < len(categories) - 1:
+            row.append(types.InlineKeyboardButton(text="⬇️", callback_data=f"sort_cat_down_{cat.id}"))
+        else:
+            row.append(types.InlineKeyboardButton(text="  ", callback_data="noop"))
+        
+        builder.row(*row)
 
+    # Предметы с кнопками сортировки
     if current_category_id is not None:
         items = await db.get_items_by_category(current_category_id)
-        for item in items:
+        for i, item in enumerate(items):
             icon_map = {
                 "text": "📝",
                 "photo": "🖼",
@@ -31,10 +49,26 @@ async def build_category_keyboard(current_category_id: int | None = None):
                 "pptx": "📊"
             }
             icon = icon_map.get(item.content_type, "📦")
-            builder.button(text=f"{icon} {item.name}", callback_data=f"nav_item_{item.id}")
+            
+            row = []
+            # Кнопка вверх (если не первый)
+            if i > 0:
+                row.append(types.InlineKeyboardButton(text="⬆️", callback_data=f"sort_item_up_{item.id}"))
+            else:
+                row.append(types.InlineKeyboardButton(text="  ", callback_data="noop"))
+            
+            # Основная кнопка предмета
+            row.append(types.InlineKeyboardButton(text=f"{icon} {item.name}", callback_data=f"nav_item_{item.id}"))
+            
+            # Кнопка вниз (если не последний)
+            if i < len(items) - 1:
+                row.append(types.InlineKeyboardButton(text="⬇️", callback_data=f"sort_item_down_{item.id}"))
+            else:
+                row.append(types.InlineKeyboardButton(text="  ", callback_data="noop"))
+            
+            builder.row(*row)
 
-    builder.adjust(2)
-
+    # Управляющие кнопки
     control_buttons = []
 
     cat_cb = f"add_cat_{current_category_id}" if current_category_id else "add_cat_root"
