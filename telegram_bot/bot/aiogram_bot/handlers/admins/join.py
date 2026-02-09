@@ -12,4 +12,4 @@ logger = logging.getLogger(__name__)
 
 @router.message(F.text == ADMIN_BTN)
 async def admin_join(message: types.Message, state: FSMContext):
-    await message.answer("💻 <b>Вы в админ панели</b>", reply_markup=admin_keyboard)
+    await message.answer("<b>Вы в админ панели</b>", reply_markup=admin_keyboard)
