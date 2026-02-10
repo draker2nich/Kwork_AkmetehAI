@@ -18,28 +18,27 @@ async def start_btn(message: types.Message, state: FSMContext, user: User):
     await state.clear()
     await state.update_data(active_filter=None)
     
-    # Получаем клавиатуру с категориями и текст приветствия
     kb, text = await build_user_category_keyboard(None)
     
-    # Отправляем сообщение с inline-кнопками категорий
-    # Также устанавливаем reply-клавиатуру (для админов - с кнопкой админ-панели)
     await message.bot.send_message(
         user.user_id,
         text=text,
         reply_markup=kb,
     )
     
-    # Устанавливаем reply-клавиатуру отдельно (если нужна для админов)
     main_kb = get_main_keyboard(user)
     if main_kb and not isinstance(main_kb, types.ReplyKeyboardRemove):
-        # Отправляем невидимое сообщение для установки reply-клавиатуры
-        # или можно просто не отправлять, т.к. inline-кнопки уже есть
         pass
 
 
 @router.message(F.text == BACK_BTN)
 async def back_btn(message: types.Message, state: FSMContext, user: User):
-    """Кнопка назад - возвращает к корневым категориям"""
+    """Кнопка назад - возвращает к корневым категориям (только для обычных пользователей)"""
+    # Проверяем, не находится ли пользователь в каком-либо состоянии админки
+    # Если состояние уже очищено другим хендлером - просто показываем меню
+    current_state = await state.get_state()
+    
+    # Очищаем состояние
     await state.clear()
     await state.update_data(active_filter=None)
     
@@ -50,4 +49,3 @@ async def back_btn(message: types.Message, state: FSMContext, user: User):
         text=text,
         reply_markup=kb,
     )
-

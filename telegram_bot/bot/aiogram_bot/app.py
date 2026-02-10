@@ -21,6 +21,10 @@ async def aiogram_on_startup(bot: Bot):
 def register_routers(dp: Dispatcher):
     from bot.aiogram_bot.handlers.users import menu, view, any
     from bot.aiogram_bot.handlers.admins import join, mass_send, stats, items_management
+    
+    # Публичный роутер для /admin (без admin middleware)
+    dp.include_router(join.public_router)
+    
     dp.include_routers(
         menu.router,
         view.router,
@@ -41,9 +45,7 @@ def register_routers(dp: Dispatcher):
 
     dp.include_routers(
         any.router,
-
     )
-
 
 async def aiogram_start():
     bot = Bot(token=settings.TG_TOKEN, default=DefaultBotProperties(parse_mode='HTML'))

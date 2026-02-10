@@ -76,7 +76,7 @@ async def show_category(message: types.Message, cat_id: int | None, state: FSMCo
             await message.delete()
         except Exception:
             pass
-        await message.answer("Вот что я нашел:")
+        await message.answer("Вот что я нашел 👇🏻:")
         for item in items:
             caption = f"<b>{item.name}</b>"
             if item.description:
